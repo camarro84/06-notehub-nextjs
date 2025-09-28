@@ -50,12 +50,30 @@ function pickTotalPages(scope: unknown): number {
   return 1
 }
 
-type RespTopNotes = { notes: Note[]; totalPages?: number; meta?: { totalPages?: number } }
-type RespTopItems = { items: Note[]; totalPages?: number; meta?: { totalPages?: number } }
-type RespTopResults = { results: Note[]; totalPages?: number; meta?: { totalPages?: number } }
-type RespDataNotes = { data: { notes: Note[]; totalPages?: number; meta?: { totalPages?: number } } }
-type RespDataItems = { data: { items: Note[]; totalPages?: number; meta?: { totalPages?: number } } }
-type RespDataResults = { data: { results: Note[]; totalPages?: number; meta?: { totalPages?: number } } }
+type RespTopNotes = {
+  notes: Note[]
+  totalPages?: number
+  meta?: { totalPages?: number }
+}
+type RespTopItems = {
+  items: Note[]
+  totalPages?: number
+  meta?: { totalPages?: number }
+}
+type RespTopResults = {
+  results: Note[]
+  totalPages?: number
+  meta?: { totalPages?: number }
+}
+type RespDataNotes = {
+  data: { notes: Note[]; totalPages?: number; meta?: { totalPages?: number } }
+}
+type RespDataItems = {
+  data: { items: Note[]; totalPages?: number; meta?: { totalPages?: number } }
+}
+type RespDataResults = {
+  data: { results: Note[]; totalPages?: number; meta?: { totalPages?: number } }
+}
 type RespDataArray = { data: Note[] }
 type ListResp =
   | RespTopNotes
@@ -67,7 +85,9 @@ type ListResp =
   | RespDataArray
   | Note[]
 
-export async function fetchNotes(params: FetchNotesParams): Promise<FetchNotesResult> {
+export async function fetchNotes(
+  params: FetchNotesParams,
+): Promise<FetchNotesResult> {
   const { page = 1, perPage = 12, search = '' } = params
 
   const res = await api.get<ListResp>('/notes', {
@@ -84,24 +104,33 @@ export async function fetchNotes(params: FetchNotesParams): Promise<FetchNotesRe
 
   if (isObj(root)) {
     const topNotes = arrProp(root, 'notes')
-    if (topNotes) return { notes: topNotes as Note[], totalPages: pickTotalPages(root) }
+    if (topNotes)
+      return { notes: topNotes as Note[], totalPages: pickTotalPages(root) }
 
     const topItems = arrProp(root, 'items')
-    if (topItems) return { notes: topItems as Note[], totalPages: pickTotalPages(root) }
+    if (topItems)
+      return { notes: topItems as Note[], totalPages: pickTotalPages(root) }
 
     const topResults = arrProp(root, 'results')
-    if (topResults) return { notes: topResults as Note[], totalPages: pickTotalPages(root) }
+    if (topResults)
+      return { notes: topResults as Note[], totalPages: pickTotalPages(root) }
 
     const dataObj = objProp(root, 'data')
     if (dataObj) {
       const nNotes = arrProp(dataObj, 'notes')
-      if (nNotes) return { notes: nNotes as Note[], totalPages: pickTotalPages(dataObj) }
+      if (nNotes)
+        return { notes: nNotes as Note[], totalPages: pickTotalPages(dataObj) }
 
       const nItems = arrProp(dataObj, 'items')
-      if (nItems) return { notes: nItems as Note[], totalPages: pickTotalPages(dataObj) }
+      if (nItems)
+        return { notes: nItems as Note[], totalPages: pickTotalPages(dataObj) }
 
       const nResults = arrProp(dataObj, 'results')
-      if (nResults) return { notes: nResults as Note[], totalPages: pickTotalPages(dataObj) }
+      if (nResults)
+        return {
+          notes: nResults as Note[],
+          totalPages: pickTotalPages(dataObj),
+        }
     }
 
     const dataArray = arrProp(root, 'data')
