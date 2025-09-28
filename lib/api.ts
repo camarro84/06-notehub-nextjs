@@ -1,16 +1,16 @@
 import axios, { AxiosInstance } from 'axios'
-import { Note, NoteTag } from '../types/note'
-
-const token = process.env.NEXT_PUBLIC_NOTEHUB_TOKEN as string
+import { Note, NoteTag } from '@/types/note'
 
 const api: AxiosInstance = axios.create({
   baseURL: 'https://notehub-public.goit.study/api',
 })
 
 api.interceptors.request.use((config) => {
+  const token = process.env.NEXT_PUBLIC_NOTEHUB_TOKEN
   if (token) {
     config.headers = config.headers ?? {}
-    config.headers.Authorization = `Bearer ${token}`
+    ;(config.headers as Record<string, string>).Authorization =
+      `Bearer ${token}`
   }
   return config
 })
@@ -21,147 +21,105 @@ export interface FetchNotesParams {
   search?: string
 }
 
-export interface FetchNotesResult {
-  notes: Note[]
+export interface FetchNotesResponse {
+  items: Note[]
   totalPages: number
 }
 
-function isObj(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
-function arrProp(o: unknown, key: string): unknown[] | null {
-  if (!isObj(o)) return null
-  const v = (o as Record<string, unknown>)[key]
-  return Array.isArray(v) ? v : null
-}
-function objProp(o: unknown, key: string): Record<string, unknown> | null {
-  if (!isObj(o)) return null
-  const v = (o as Record<string, unknown>)[key]
-  return isObj(v) ? (v as Record<string, unknown>) : null
-}
-function pickTotalPages(scope: unknown): number {
-  if (isObj(scope) && typeof scope['totalPages'] === 'number') {
-    return scope['totalPages'] as number
+type AnyJson = unknown
+
+/** извлекаем массив заметок из разных возможных форматов ответа */
+function extractItems(payload: AnyJson): Note[] {
+  const tryArrays: any[] = []
+
+  const pushIfArray = (v: any) => {
+    if (Array.isArray(v)) tryArrays.push(v)
   }
-  const meta = objProp(scope, 'meta')
-  if (meta && typeof meta['totalPages'] === 'number') {
-    return meta['totalPages'] as number
-  }
+
+  const d: any = payload as any
+
+  pushIfArray(d?.items)
+  pushIfArray(d?.data)
+  pushIfArray(d?.notes)
+  pushIfArray(d?.results)
+  pushIfArray(d?.list)
+  pushIfArray(d?.rows)
+
+  pushIfArray(d?.items?.docs)
+  pushIfArray(d?.items?.data)
+  pushIfArray(d?.items?.rows)
+
+  pushIfArray(d?.data?.items)
+  pushIfArray(d?.data?.docs)
+  pushIfArray(d?.data?.list)
+  pushIfArray(d?.data?.rows)
+
+  pushIfArray(d?.payload?.items)
+  pushIfArray(d?.payload?.data)
+  pushIfArray(d?.payload?.docs)
+
+  const pick = tryArrays.find(
+    (arr) =>
+      Array.isArray(arr) &&
+      arr.length >= 0 &&
+      (arr.length === 0 ||
+        (typeof arr[0] === 'object' &&
+          arr[0] !== null &&
+          ('title' in arr[0] || 'content' in arr[0] || 'tag' in arr[0]))),
+  )
+
+  return (pick ?? []) as Note[]
+}
+
+/** извлекаем totalPages из разных возможных мест */
+function extractTotalPages(payload: AnyJson): number {
+  const d: any = payload as any
+  if (typeof d?.totalPages === 'number') return d.totalPages
+  if (typeof d?.items?.totalPages === 'number') return d.items.totalPages
+  if (typeof d?.meta?.totalPages === 'number') return d.meta.totalPages
+  if (typeof d?.pagination?.totalPages === 'number')
+    return d.pagination.totalPages
   return 1
 }
 
-type RespTopNotes = {
-  notes: Note[]
-  totalPages?: number
-  meta?: { totalPages?: number }
+function extractItem(payload: AnyJson): Note {
+  const d: any = payload as any
+  return (d?.item ?? d) as Note
 }
-type RespTopItems = {
-  items: Note[]
-  totalPages?: number
-  meta?: { totalPages?: number }
-}
-type RespTopResults = {
-  results: Note[]
-  totalPages?: number
-  meta?: { totalPages?: number }
-}
-type RespDataNotes = {
-  data: { notes: Note[]; totalPages?: number; meta?: { totalPages?: number } }
-}
-type RespDataItems = {
-  data: { items: Note[]; totalPages?: number; meta?: { totalPages?: number } }
-}
-type RespDataResults = {
-  data: { results: Note[]; totalPages?: number; meta?: { totalPages?: number } }
-}
-type RespDataArray = { data: Note[] }
-type ListResp =
-  | RespTopNotes
-  | RespTopItems
-  | RespTopResults
-  | RespDataNotes
-  | RespDataItems
-  | RespDataResults
-  | RespDataArray
-  | Note[]
+
+type CreatePayload = { title: string; content: string; tag: NoteTag }
+type UpdatePayload = Partial<CreatePayload>
 
 export async function fetchNotes(
-  params: FetchNotesParams,
-): Promise<FetchNotesResult> {
+  params: FetchNotesParams = {},
+): Promise<FetchNotesResponse> {
   const { page = 1, perPage = 12, search = '' } = params
-
-  const res = await api.get<ListResp>('/notes', {
-    params: { page, perPage, search: search || undefined },
+  const res = await api.get<AnyJson>('/notes', {
+    params: { page, perPage, search },
   })
-
-  const root = res.data as unknown
-
-  if (Array.isArray(root)) {
-    const notes = root as Note[]
-    const totalPages = Math.max(1, Math.ceil(notes.length / perPage))
-    return { notes, totalPages }
-  }
-
-  if (isObj(root)) {
-    const topNotes = arrProp(root, 'notes')
-    if (topNotes)
-      return { notes: topNotes as Note[], totalPages: pickTotalPages(root) }
-
-    const topItems = arrProp(root, 'items')
-    if (topItems)
-      return { notes: topItems as Note[], totalPages: pickTotalPages(root) }
-
-    const topResults = arrProp(root, 'results')
-    if (topResults)
-      return { notes: topResults as Note[], totalPages: pickTotalPages(root) }
-
-    const dataObj = objProp(root, 'data')
-    if (dataObj) {
-      const nNotes = arrProp(dataObj, 'notes')
-      if (nNotes)
-        return { notes: nNotes as Note[], totalPages: pickTotalPages(dataObj) }
-
-      const nItems = arrProp(dataObj, 'items')
-      if (nItems)
-        return { notes: nItems as Note[], totalPages: pickTotalPages(dataObj) }
-
-      const nResults = arrProp(dataObj, 'results')
-      if (nResults)
-        return {
-          notes: nResults as Note[],
-          totalPages: pickTotalPages(dataObj),
-        }
-    }
-
-    const dataArray = arrProp(root, 'data')
-    if (dataArray) {
-      const notes = dataArray as Note[]
-      const totalPages = pickTotalPages(root)
-      return { notes, totalPages }
-    }
-  }
-
-  return { notes: [], totalPages: 1 }
+  const items = extractItems(res.data)
+  const totalPages = extractTotalPages(res.data)
+  return { items, totalPages }
 }
 
-export interface CreateNoteParams {
-  title: string
-  content: string
-  tag: NoteTag
+export async function fetchNoteById(id: string): Promise<Note> {
+  const res = await api.get<AnyJson>(`/notes/${id}`)
+  return extractItem(res.data)
 }
 
-export async function createNote(payload: CreateNoteParams): Promise<Note> {
-  const res = await api.post<Note>('/notes', payload)
-  return res.data
+export async function createNote(payload: CreatePayload): Promise<Note> {
+  const res = await api.post<AnyJson>('/notes', payload)
+  return extractItem(res.data)
 }
 
-export async function deleteNote(id: number): Promise<Note> {
-  const res = await api.delete<Note>(`/notes/${id}`)
-  return res.data
+export async function updateNote(
+  id: string,
+  payload: UpdatePayload,
+): Promise<Note> {
+  const res = await api.put<AnyJson>(`/notes/${id}`, payload)
+  return extractItem(res.data)
 }
 
-export async function fetchNoteById(id: number): Promise<Note> {
-  const res = await api.get(`/notes/${id}`)
-  const raw = (res.data as any)?.item ?? (res.data as any)
-  return raw as Note
+export async function deleteNote(id: string): Promise<void> {
+  await api.delete<void>(`/notes/${id}`)
 }

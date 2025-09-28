@@ -1,93 +1,74 @@
 'use client'
-
-import { useEffect, useMemo, useState } from 'react'
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  keepPreviousData,
-} from '@tanstack/react-query'
-import {
-  createNote,
-  deleteNote,
-  fetchNotes,
-  type FetchNotesResult,
-} from '@/lib/api'
-import { useDebounce } from 'use-debounce'
-import NoteForm from '@/components/NoteForm/NoteForm'
-import NoteList from '@/components/NoteList/NoteList'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchNotes } from '@/lib/api'
 import SearchBox from '@/components/SearchBox/SearchBox'
+import NoteList from '@/components/NoteList/NoteList'
 import Pagination from '@/components/Pagination/Pagination'
-import { Note, NoteTag } from '@/types/note'
+import Modal from '@/components/Modal/Modal'
+import NoteForm from '@/components/NoteForm/NoteForm'
+import { useDebounce } from 'use-debounce'
+import css from './NotesPage.module.css'
 
 export default function NotesClient() {
-  const [page, setPage] = useState(1)
-  const [perPage] = useState(12)
+  const [page, setPage] = useState(0)
   const [term, setTerm] = useState('')
-  const [deletingId, setDeletingId] = useState<number | undefined>(undefined)
+  const [open, setOpen] = useState(false)
   const [debounced] = useDebounce(term.trim(), 300)
-  const qc = useQueryClient()
 
-  useEffect(() => {
-    setPage(1)
-  }, [debounced])
-
-  const queryKey = useMemo(
-    () => ['notes', { page, perPage, search: debounced }],
-    [page, perPage, debounced],
-  )
-
-  const { data, isLoading, isError, error } = useQuery<FetchNotesResult>({
-    queryKey,
-    queryFn: () => fetchNotes({ page, perPage, search: debounced }),
-    placeholderData: keepPreviousData,
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['notes', { page: page + 1, perPage: 12, search: debounced }],
+    queryFn: () =>
+      fetchNotes({ page: page + 1, perPage: 12, search: debounced }),
+    placeholderData: (prev) => prev,
   })
 
-  const createMutation = useMutation({
-    mutationFn: (payload: { title: string; content: string; tag: NoteTag }) =>
-      createNote(payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['notes'] }),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      setDeletingId(id)
-      await deleteNote(id as any)
-    },
-    onSettled: () => {
-      setDeletingId(undefined)
-      qc.invalidateQueries({ queryKey: ['notes'] })
-    },
-  })
-
-  const items: Note[] = data?.notes ?? []
+  const items = data?.items ?? []
   const totalPages = data?.totalPages ?? 1
 
   return (
-    <>
-      <SearchBox value={term} onChange={setTerm} onSubmit={() => setPage(1)} />
-      <NoteForm
-        onSubmit={(values) => createMutation.mutate(values)}
-        isSubmitting={createMutation.isPending}
-      />
-      {isLoading && <p>Loading, please wait...</p>}
-      {isError && (
-        <p>Could not fetch the list of notes. {(error as Error).message}</p>
-      )}
+    <div className={css.app}>
+      <div className={css.toolbar}>
+        <SearchBox
+          value={term}
+          onChange={(v) => {
+            setTerm(v)
+            setPage(0)
+          }}
+          placeholder="Search notes..."
+        />
+        <button className={css.button} onClick={() => setOpen(true)}>
+          New note
+        </button>
+      </div>
+
+      {isLoading && <p>Loading...</p>}
+      {isError && <p>Error: {(error as Error).message}</p>}
+
       {!isLoading && !isError && (
         <>
-          <NoteList
-            items={items}
-            onDelete={(id) => deleteMutation.mutate(id)}
-            deletingId={deletingId}
-          />
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
+          {items.length > 0 ? (
+            <NoteList items={items} />
+          ) : (
+            <p>No notes found</p>
+          )}
+          {totalPages > 1 && (
+            <Pagination
+              pageCount={totalPages}
+              currentPage={page}
+              onPageChange={setPage}
+            />
+          )}
         </>
       )}
-    </>
+
+      <Modal open={open} onClose={() => setOpen(false)}>
+        <h3>Create note</h3>
+        <NoteForm
+          onCancel={() => setOpen(false)}
+          onSuccess={() => setOpen(false)}
+        />
+      </Modal>
+    </div>
   )
 }

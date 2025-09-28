@@ -1,37 +1,25 @@
 'use client'
-
-import { FormEvent } from 'react'
+import { ChangeEvent } from 'react'
 import css from './SearchBox.module.css'
+
+interface SearchBoxProps {
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}
 
 export default function SearchBox({
   value,
   onChange,
-  onSubmit,
-}: {
-  value: string
-  onChange: (v: string) => void
-  onSubmit: () => void
-}) {
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    onSubmit()
-  }
-
+  placeholder,
+}: SearchBoxProps) {
+  const handle = (e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)
   return (
-    <form className={css.form} onSubmit={handleSubmit} noValidate>
-      <input
-        id="search"
-        name="search"
-        className={css.input}
-        type="text"
-        placeholder="Search..."
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        autoComplete="off"
-      />
-      <button className={css.button} type="submit">
-        Search
-      </button>
-    </form>
+    <input
+      className={css.input}
+      value={value}
+      onChange={handle}
+      placeholder={placeholder ?? 'Search...'}
+    />
   )
 }

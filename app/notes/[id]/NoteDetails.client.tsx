@@ -1,41 +1,33 @@
 'use client'
-
 import { useParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { fetchNoteById } from '@/lib/api'
 import css from './NoteDetails.module.css'
 
-function formatISOLocal(dt: string) {
-  const d = new Date(dt)
-  return d.toISOString().replace('T', ' ').slice(0, 16)
-}
-
 export default function NoteDetailsClient() {
   const params = useParams()
-  const id = Number(params.id as string)
+  const id = String(params.id)
 
-  const {
-    data: note,
-    isLoading,
-    isError,
-  } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['note', id],
     queryFn: () => fetchNoteById(id),
+    refetchOnMount: false,
   })
 
-  if (isLoading) return <p>Loading, please wait...</p>
-  if (isError || !note) return <p>Something went wrong.</p>
+  if (isLoading) return <div>Loading...</div>
+  if (isError) return <div>Error: {(error as Error).message}</div>
+  if (!data) return null
 
   return (
     <div className={css.container}>
       <div className={css.item}>
         <div className={css.header}>
-          <h2>{note.title}</h2>
+          <h2>{data.title}</h2>
         </div>
-        <p className={css.content}>{note.content}</p>
+        <p className={css.content}>{data.content}</p>
         <p className={css.date}>
-          <time suppressHydrationWarning dateTime={note.createdAt}>
-            {formatISOLocal(note.createdAt)}
+          <time suppressHydrationWarning dateTime={data.createdAt}>
+            {data.createdAt}
           </time>
         </p>
       </div>

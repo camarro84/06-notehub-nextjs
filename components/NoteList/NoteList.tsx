@@ -1,35 +1,64 @@
-'use client'
+"use client";
+import { useRouter } from "next/navigation";
+import css from "./NoteList.module.css";
+import { Note } from "@/types/note";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { deleteNote } from "@/lib/api";
 
-import Link from 'next/link'
-import css from './NoteList.module.css'
-import { Note } from '@/types/note'
+interface NoteListProps {
+  items: Note[];
+}
 
-export default function NoteList({
-  items,
-  onDelete,
-  deletingId,
-}: {
-  items: Note[]
-  onDelete: (id: number) => void
-  deletingId?: number
-}) {
+export default function NoteList({ items }: NoteListProps) {
+  const qc = useQueryClient();
+  const router = useRouter();
+
+  const delMut = useMutation({
+    mutationFn: (id: string) => deleteNote(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
+  });
+
+  if (!items.length) return null;
+
   return (
     <ul className={css.list}>
       {items.map((n) => (
-        <li key={`${n.id}-${n.createdAt}`} className={css.listItem}>
-          <h3 className={css.title}>{n.title}</h3>
-          <p className={css.content}>{n.content}</p>
-          <div className={css.footer}>
-            <span className={css.tag}>{n.tag}</span>
-            <div>
-              <Link className={css.link} href={`/notes/${n.id}`}>
-                View details
-              </Link>
+        <li key={n.id} className={css.listItem}>
+          <div
+            className={css.card}
+            style={{ display: "flex", flexDirection: "column", height: "100%" }}
+          >
+            <div className={css.header}>
+              <h3 className={css.title}>{n.title}</h3>
+              <span className={css.badge}>{n.tag}</span>
+            </div>
+
+            <p className={css.content}>{n.content}</p>
+
+            <p className={css.meta}>
+              <span style={{ fontWeight: 600 }}>
+                <time suppressHydrationWarning>
+                  {new Date(n.createdAt).toLocaleString()}
+                </time>
+              </span>
+            </p>
+
+            <div
+              className={css.actions}
+              style={{ marginTop: "auto", display: "flex", gap: 12 }}
+            >
               <button
                 type="button"
                 className={css.button}
-                onClick={() => onDelete(n.id)}
-                disabled={deletingId === n.id}
+                onClick={() => router.push(`/notes/${n.id}`)}
+              >
+                View details
+              </button>
+              <button
+                type="button"
+                className={css.button}
+                onClick={() => delMut.mutate(n.id)}
+                disabled={delMut.isPending}
               >
                 Delete
               </button>
@@ -38,5 +67,5 @@ export default function NoteList({
         </li>
       ))}
     </ul>
-  )
+  );
 }

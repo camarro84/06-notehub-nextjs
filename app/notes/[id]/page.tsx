@@ -6,21 +6,18 @@ import {
 import { fetchNoteById } from '@/lib/api'
 import NoteDetailsClient from './NoteDetails.client'
 
-type Props = {
-  params: Promise<{ id: string }>
-}
+export const dynamic = 'force-dynamic'
 
-export default async function NoteDetailsPage({ params }: Props) {
+type Params = { params: Promise<{ id: string }> }
+
+export default async function NoteDetails({ params }: Params) {
   const { id } = await params
-  const noteId = Number(id)
-
   const qc = new QueryClient()
   await qc.prefetchQuery({
-    queryKey: ['note', noteId],
-    queryFn: () => fetchNoteById(noteId),
+    queryKey: ['note', id],
+    queryFn: () => fetchNoteById(id),
   })
   const state = dehydrate(qc)
-
   return (
     <HydrationBoundary state={state}>
       <NoteDetailsClient />
