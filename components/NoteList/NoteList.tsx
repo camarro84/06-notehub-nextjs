@@ -1,24 +1,24 @@
-"use client";
-import { useRouter } from "next/navigation";
-import css from "./NoteList.module.css";
-import { Note } from "@/types/note";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { deleteNote } from "@/lib/api";
+'use client'
+import { useRouter } from 'next/navigation'
+import css from './NoteList.module.css'
+import { Note } from '@/types/note'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { deleteNote } from '@/lib/api'
 
 interface NoteListProps {
-  items: Note[];
+  items: Note[]
 }
 
 export default function NoteList({ items }: NoteListProps) {
-  const qc = useQueryClient();
-  const router = useRouter();
+  const qc = useQueryClient()
+  const router = useRouter()
 
   const delMut = useMutation({
     mutationFn: (id: string) => deleteNote(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notes"] }),
-  });
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notes'] }),
+  })
 
-  if (!items.length) return null;
+  if (!items.length) return null
 
   return (
     <ul className={css.list}>
@@ -26,7 +26,7 @@ export default function NoteList({ items }: NoteListProps) {
         <li key={n.id} className={css.listItem}>
           <div
             className={css.card}
-            style={{ display: "flex", flexDirection: "column", height: "100%" }}
+            style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
           >
             <div className={css.header}>
               <h3 className={css.title}>{n.title}</h3>
@@ -45,7 +45,7 @@ export default function NoteList({ items }: NoteListProps) {
 
             <div
               className={css.actions}
-              style={{ marginTop: "auto", display: "flex", gap: 12 }}
+              style={{ marginTop: 'auto', display: 'flex', gap: 12 }}
             >
               <button
                 type="button"
@@ -67,5 +67,5 @@ export default function NoteList({ items }: NoteListProps) {
         </li>
       ))}
     </ul>
-  );
+  )
 }

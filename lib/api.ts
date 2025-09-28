@@ -26,65 +26,88 @@ export interface FetchNotesResponse {
   totalPages: number
 }
 
-type AnyJson = unknown
-
-/** извлекаем массив заметок из разных возможных форматов ответа */
-function extractItems(payload: AnyJson): Note[] {
-  const tryArrays: any[] = []
-
-  const pushIfArray = (v: any) => {
-    if (Array.isArray(v)) tryArrays.push(v)
-  }
-
-  const d: any = payload as any
-
-  pushIfArray(d?.items)
-  pushIfArray(d?.data)
-  pushIfArray(d?.notes)
-  pushIfArray(d?.results)
-  pushIfArray(d?.list)
-  pushIfArray(d?.rows)
-
-  pushIfArray(d?.items?.docs)
-  pushIfArray(d?.items?.data)
-  pushIfArray(d?.items?.rows)
-
-  pushIfArray(d?.data?.items)
-  pushIfArray(d?.data?.docs)
-  pushIfArray(d?.data?.list)
-  pushIfArray(d?.data?.rows)
-
-  pushIfArray(d?.payload?.items)
-  pushIfArray(d?.payload?.data)
-  pushIfArray(d?.payload?.docs)
-
-  const pick = tryArrays.find(
-    (arr) =>
-      Array.isArray(arr) &&
-      arr.length >= 0 &&
-      (arr.length === 0 ||
-        (typeof arr[0] === 'object' &&
-          arr[0] !== null &&
-          ('title' in arr[0] || 'content' in arr[0] || 'tag' in arr[0]))),
-  )
-
-  return (pick ?? []) as Note[]
+interface ItemEnvelope {
+  item: Note
 }
 
-/** извлекаем totalPages из разных возможных мест */
-function extractTotalPages(payload: AnyJson): number {
-  const d: any = payload as any
-  if (typeof d?.totalPages === 'number') return d.totalPages
-  if (typeof d?.items?.totalPages === 'number') return d.items.totalPages
-  if (typeof d?.meta?.totalPages === 'number') return d.meta.totalPages
-  if (typeof d?.pagination?.totalPages === 'number')
-    return d.pagination.totalPages
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null
+}
+
+function isNote(v: unknown): v is Note {
+  return (
+    isRecord(v) &&
+    typeof v.id === 'string' &&
+    typeof v.title === 'string' &&
+    typeof v.content === 'string' &&
+    typeof v.tag === 'string' &&
+    typeof v.createdAt === 'string' &&
+    typeof v.updatedAt === 'string'
+  )
+}
+
+function isNoteArray(v: unknown): v is Note[] {
+  return Array.isArray(v) && v.every((x) => isNote(x))
+}
+
+function extractItems(payload: unknown): Note[] {
+  const d = payload
+  if (isRecord(d) && isNoteArray(d.items)) return d.items
+  if (isRecord(d) && isNoteArray(d.data)) return d.data
+  if (
+    isRecord(d) &&
+    isRecord(d.items) &&
+    isNoteArray((d.items as Record<string, unknown>).docs)
+  ) {
+    return (d.items as { docs: Note[] }).docs
+  }
+  if (
+    isRecord(d) &&
+    isRecord(d.items) &&
+    isNoteArray((d.items as Record<string, unknown>).data)
+  ) {
+    return (d.items as { data: Note[] }).data
+  }
+  if (isRecord(d) && isNoteArray(d.notes)) return d.notes
+  if (isRecord(d) && isNoteArray(d.results)) return d.results
+  return []
+}
+
+function extractTotalPages(payload: unknown): number {
+  const d = payload
+  if (isRecord(d) && typeof d.totalPages === 'number') return d.totalPages
+  if (
+    isRecord(d) &&
+    isRecord(d.items) &&
+    typeof (d.items as Record<string, unknown>).totalPages === 'number'
+  ) {
+    return (d.items as { totalPages: number }).totalPages
+  }
+  if (
+    isRecord(d) &&
+    isRecord(d.meta) &&
+    typeof (d.meta as Record<string, unknown>).totalPages === 'number'
+  ) {
+    return (d.meta as { totalPages: number }).totalPages
+  }
+  if (
+    isRecord(d) &&
+    isRecord(d.pagination) &&
+    typeof (d.pagination as Record<string, unknown>).totalPages === 'number'
+  ) {
+    return (d.pagination as { totalPages: number }).totalPages
+  }
   return 1
 }
 
-function extractItem(payload: AnyJson): Note {
-  const d: any = payload as any
-  return (d?.item ?? d) as Note
+function extractItem(payload: unknown): Note {
+  if (isRecord(payload) && isRecord(payload.item) && isNote(payload.item)) {
+    return payload.item
+  }
+  if (isNote(payload)) {
+    return payload
+  }
+  throw new Error('Invalid note response shape')
 }
 
 type CreatePayload = { title: string; content: string; tag: NoteTag }
@@ -94,7 +117,7 @@ export async function fetchNotes(
   params: FetchNotesParams = {},
 ): Promise<FetchNotesResponse> {
   const { page = 1, perPage = 12, search = '' } = params
-  const res = await api.get<AnyJson>('/notes', {
+  const res = await api.get<unknown>('/notes', {
     params: { page, perPage, search },
   })
   const items = extractItems(res.data)
@@ -103,12 +126,12 @@ export async function fetchNotes(
 }
 
 export async function fetchNoteById(id: string): Promise<Note> {
-  const res = await api.get<AnyJson>(`/notes/${id}`)
+  const res = await api.get<unknown>(`/notes/${id}`)
   return extractItem(res.data)
 }
 
 export async function createNote(payload: CreatePayload): Promise<Note> {
-  const res = await api.post<AnyJson>('/notes', payload)
+  const res = await api.post<unknown>('/notes', payload)
   return extractItem(res.data)
 }
 
@@ -116,7 +139,7 @@ export async function updateNote(
   id: string,
   payload: UpdatePayload,
 ): Promise<Note> {
-  const res = await api.put<AnyJson>(`/notes/${id}`, payload)
+  const res = await api.put<unknown>(`/notes/${id}`, payload)
   return extractItem(res.data)
 }
 
