@@ -1,35 +1,25 @@
-import axios from 'axios'
 import {
   HydrationBoundary,
   QueryClient,
   dehydrate,
 } from '@tanstack/react-query'
+import { fetchNoteById } from '@/lib/api'
 import NoteDetailsClient from './NoteDetails.client'
 
-const token = process.env.NEXT_PUBLIC_NOTEHUB_TOKEN ?? ''
-
-async function ssrFetchNoteById(id: number) {
-  const res = await axios.get(
-    `https://notehub-public.goit.study/api/notes/${id}`,
-    {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    },
-  )
-  return res.data?.item ?? res.data
-}
-
-interface Params {
+type PageProps = Readonly<{
   params: { id: string }
-}
+  searchParams?: Record<string, string | string[] | undefined>
+}>
 
-export default async function NoteDetails({ params }: Params) {
+export default async function NoteDetailsPage({ params }: PageProps) {
   const id = Number(params.id)
   const qc = new QueryClient()
   await qc.prefetchQuery({
     queryKey: ['note', id],
-    queryFn: () => ssrFetchNoteById(id),
+    queryFn: () => fetchNoteById(id),
   })
   const state = dehydrate(qc)
+
   return (
     <HydrationBoundary state={state}>
       <NoteDetailsClient />
