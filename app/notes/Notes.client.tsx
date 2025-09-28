@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   useMutation,
   useQuery,
@@ -13,6 +13,7 @@ import {
   fetchNotes,
   type FetchNotesResult,
 } from '@/lib/api'
+import { useDebounce } from 'use-debounce'
 import NoteForm from '@/components/NoteForm/NoteForm'
 import NoteList from '@/components/NoteList/NoteList'
 import SearchBox from '@/components/SearchBox/SearchBox'
@@ -22,18 +23,23 @@ import { Note, NoteTag } from '@/types/note'
 export default function NotesClient() {
   const [page, setPage] = useState(1)
   const [perPage] = useState(12)
-  const [search, setSearch] = useState('')
+  const [term, setTerm] = useState('')
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined)
+  const [debounced] = useDebounce(term.trim(), 300)
   const qc = useQueryClient()
 
+  useEffect(() => {
+    setPage(1)
+  }, [debounced])
+
   const queryKey = useMemo(
-    () => ['notes', { page, perPage, search }],
-    [page, perPage, search],
+    () => ['notes', { page, perPage, search: debounced }],
+    [page, perPage, debounced],
   )
 
   const { data, isLoading, isError, error } = useQuery<FetchNotesResult>({
     queryKey,
-    queryFn: () => fetchNotes({ page, perPage, search }),
+    queryFn: () => fetchNotes({ page, perPage, search: debounced }),
     placeholderData: keepPreviousData,
   })
 
@@ -46,7 +52,7 @@ export default function NotesClient() {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       setDeletingId(id)
-      await deleteNote(id)
+      await deleteNote(id as any)
     },
     onSettled: () => {
       setDeletingId(undefined)
@@ -59,11 +65,7 @@ export default function NotesClient() {
 
   return (
     <>
-      <SearchBox
-        value={search}
-        onChange={setSearch}
-        onSubmit={() => setPage(1)}
-      />
+      <SearchBox value={term} onChange={setTerm} onSubmit={() => setPage(1)} />
       <NoteForm
         onSubmit={(values) => createMutation.mutate(values)}
         isSubmitting={createMutation.isPending}

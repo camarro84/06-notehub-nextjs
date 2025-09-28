@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { FormEvent } from 'react'
 import css from './SearchBox.module.css'
 
 export default function SearchBox({
@@ -12,22 +12,26 @@ export default function SearchBox({
   onChange: (v: string) => void
   onSubmit: () => void
 }) {
-  const [local, setLocal] = useState(value)
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    onSubmit()
+  }
+
   return (
-    <div className={css.row}>
+    <form className={css.form} onSubmit={handleSubmit} noValidate>
       <input
+        id="search"
+        name="search"
+        className={css.input}
+        type="text"
         placeholder="Search..."
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete="off"
       />
-      <button
-        onClick={() => {
-          onChange(local)
-          onSubmit()
-        }}
-      >
+      <button className={css.button} type="submit">
         Search
       </button>
-    </div>
+    </form>
   )
 }
