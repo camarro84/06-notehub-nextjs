@@ -3,58 +3,44 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Formik, Form, Field, ErrorMessage, type FormikHelpers } from 'formik'
 import * as Yup from 'yup'
 import { Note, NoteTag } from '@/types/note'
-import { createNote, updateNote } from '@/lib/api'
+import { createNote } from '@/lib/api'
 import css from './NoteForm.module.css'
 
 interface NoteFormProps {
-  initial?: Partial<Pick<Note, 'id' | 'title' | 'content' | 'tag'>>
   onCancel: () => void
-  onSuccess?: (note: Note) => void
 }
 
-type FormValues = { title: string; content: string; tag: NoteTag }
+type FormValues = {
+  title: string
+  content?: string
+  tag: NoteTag
+}
 
 const Schema = Yup.object({
-  title: Yup.string().min(1).max(200).required(),
-  content: Yup.string().min(1).required(),
+  title: Yup.string().min(3).max(50).required(),
+  content: Yup.string().max(500).optional(),
   tag: Yup.mixed<NoteTag>()
     .oneOf(['Todo', 'Work', 'Personal', 'Meeting', 'Shopping'])
     .required(),
 })
 
-export default function NoteForm({
-  initial,
-  onCancel,
-  onSuccess,
-}: NoteFormProps) {
+export default function NoteForm({ onCancel }: NoteFormProps) {
   const qc = useQueryClient()
 
   const createMut = useMutation({
-    mutationFn: createNote,
-    onSuccess: (note) => {
+    mutationFn: (values: FormValues) => createNote(values),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notes'] })
-      onSuccess?.(note)
+      onCancel()
     },
   })
-
-  const updateMut = useMutation({
-    mutationFn: (payload: { id: string; data: Partial<FormValues> }) =>
-      updateNote(payload.id, payload.data),
-    onSuccess: (note) => {
-      qc.invalidateQueries({ queryKey: ['notes'] })
-      qc.invalidateQueries({ queryKey: ['note', note.id] })
-      onSuccess?.(note)
-    },
-  })
-
-  const isEdit = Boolean(initial?.id)
 
   return (
     <Formik<FormValues>
       initialValues={{
-        title: initial?.title ?? '',
-        content: initial?.content ?? '',
-        tag: (initial?.tag ?? 'Todo') as NoteTag,
+        title: '',
+        content: '',
+        tag: 'Todo',
       }}
       validationSchema={Schema}
       onSubmit={async (
@@ -62,11 +48,7 @@ export default function NoteForm({
         { setSubmitting }: FormikHelpers<FormValues>,
       ) => {
         try {
-          if (isEdit && initial?.id) {
-            await updateMut.mutateAsync({ id: initial.id, data: values })
-          } else {
-            await createMut.mutateAsync(values)
-          }
+          await createMut.mutateAsync(values)
         } finally {
           setSubmitting(false)
         }
@@ -105,7 +87,7 @@ export default function NoteForm({
 
           <div className={css.actions}>
             <button type="submit" disabled={isSubmitting}>
-              {isEdit ? 'Save' : 'Create'}
+              Create
             </button>
             <button type="button" onClick={onCancel}>
               Cancel

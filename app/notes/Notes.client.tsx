@@ -23,7 +23,7 @@ export default function NotesClient() {
     placeholderData: (prev) => prev,
   })
 
-  const items = data?.items ?? []
+  const notes = data?.notes ?? []
   const totalPages = data?.totalPages ?? 1
 
   return (
@@ -47,8 +47,8 @@ export default function NotesClient() {
 
       {!isLoading && !isError && (
         <>
-          {items.length > 0 ? (
-            <NoteList items={items} />
+          {notes.length > 0 ? (
+            <NoteList items={notes} />
           ) : (
             <p>No notes found</p>
           )}
@@ -64,10 +64,7 @@ export default function NotesClient() {
 
       <Modal open={open} onClose={() => setOpen(false)}>
         <h3>Create note</h3>
-        <NoteForm
-          onCancel={() => setOpen(false)}
-          onSuccess={() => setOpen(false)}
-        />
+        <NoteForm onCancel={() => setOpen(false)} />
       </Modal>
     </div>
   )
